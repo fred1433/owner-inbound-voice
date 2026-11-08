@@ -44,6 +44,7 @@ function route(method, path) {
     if (parts.length === 2 && parts[1] === "upsert" && method === "POST") return { op: "POST /contacts/upsert" };
     if (parts.length === 2 && (method === "GET" || method === "PUT")) return { op: method + " /contacts/{contactId}", id: parts[1] };
     if (parts.length === 3 && parts[2] === "tasks" && method === "POST") return { op: "POST /contacts/{contactId}/tasks", id: parts[1] };
+    if (parts.length === 3 && parts[2] === "tasks" && method === "GET") return { op: "GET /contacts/{contactId}/tasks", id: parts[1] };
     if (parts.length === 3 && parts[2] === "notes" && method === "POST") return { op: "POST /contacts/{contactId}/notes", id: parts[1] };
   }
   if (parts[0] === "opportunities") {
@@ -64,6 +65,16 @@ export function dndBlocks(contact, channel) {
   if (contact.dnd === true) return true;
   const entry = (contact.dndSettings || {})[channel];
   return Boolean(entry && entry.status && entry.status !== "inactive");
+}
+
+// An instant written in a zone, with its offset: 2026-11-17T10:30:00-06:00
+function inZone(epoch, zone) {
+  const format = new Intl.DateTimeFormat("en-US", {
+    timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23", timeZoneName: "longOffset",
+  });
+  const p = Object.fromEntries(format.formatToParts(new Date(epoch)).map((x) => [x.type, x.value]));
+  const offset = p.timeZoneName === "GMT" ? "+00:00" : p.timeZoneName.replace("GMT", "");
+  return p.year + "-" + p.month + "-" + p.day + "T" + p.hour + ":" + p.minute + ":" + p.second + offset;
 }
 
 export function createMockCrm(contracts, options) {
@@ -142,6 +153,10 @@ export function createMockCrm(contracts, options) {
         state.tasks.push(task);
         return reply(contract, 201, { task });
       }
+      case "GET /contacts/{contactId}/tasks": {
+        if (!state.contacts.has(found.id)) return { status: 400, body: { message: "unknown contact" } };
+        return reply(contract, 200, { tasks: state.tasks.filter((t) => t.contactId === found.id) });
+      }
       case "POST /contacts/{contactId}/notes": {
         if (!state.contacts.has(found.id)) return { status: 400, body: { message: "unknown contact" } };
         const note = Object.assign({ id: nextId("note"), contactId: found.id }, body);
@@ -166,21 +181,31 @@ export function createMockCrm(contracts, options) {
         if (body.type === "SMS" && dndBlocks(contact, "SMS")) return { status: 400, body: { message: "contact has opted out of this channel" } };
         const message = Object.assign({ id: nextId("message") }, body);
         state.messages.push(message);
-        return reply(contract, 200, { conversationId: nextId("conversation"), messageId: message.id, msg: "accepted by the mock" });
+        return reply(contract, 200, { conversationId: nextId("conversation"), messageId: message.id, status: "pending", msg: "accepted by the mock" });
       }
       case "GET /calendars/{calendarId}/free-slots": {
-        const taken = new Set(state.appointments.map((a) => a.startTime));
+        const zone = req.query.timezone || "UTC";
+        const from = Number(req.query.startDate);
+        const to = Number(req.query.endDate);
+        const taken = new Set(state.appointments.map((a) => Date.parse(a.startTime)));
         const days = {};
-        for (const slot of state.slots) {
-          if (taken.has(slot)) continue;
-          const day = slot.slice(0, 10);
-          (days[day] = days[day] || { slots: [] }).slots.push(slot);
+        try {
+          for (const slot of state.slots) {
+            const at = Date.parse(slot);
+            if (taken.has(at) || at < from || at >= to) continue;
+            const local = inZone(at, zone);
+            const day = local.slice(0, 10);
+            (days[day] = days[day] || { slots: [] }).slots.push(local);
+          }
+        } catch {
+          return { status: 400, body: { message: "unknown time zone" } };
         }
         return reply(contract, 200, days);
       }
       case "POST /calendars/events/appointments": {
-        const taken = state.appointments.some((a) => a.startTime === body.startTime);
-        if (taken || !state.slots.includes(body.startTime)) return { status: 400, body: { message: "the slot you have selected is no longer available" } };
+        const at = Date.parse(body.startTime);
+        const taken = state.appointments.some((a) => Date.parse(a.startTime) === at);
+        if (taken || !state.slots.some((slot) => Date.parse(slot) === at)) return { status: 400, body: { message: "the slot you have selected is no longer available" } };
         const appointment = Object.assign({ id: nextId("appointment"), appointmentStatus: "confirmed" }, body);
         state.appointments.push(appointment);
         return reply(contract, 200, appointment);

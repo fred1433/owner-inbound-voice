@@ -53,42 +53,67 @@ function sentences(text) {
 }
 
 // ---------- What the owner asked for ----------
+// A closed list of patterns, not an understanding of English. Anything it does not recognise is
+// "unclear": nothing automatic happens and the advisor reads her words.
 
+const SHOP = "(?:the|my)\\s+(?:shop|office|work|front|business)";
 const FULL_STOP = [
-  /\b(?:do not|don't|dont|never|please don't)\s+(?:contact|reach out to|get in touch with)\s+(?:me|us)\b/,
-  /\b(?:do not|don't|dont)\s+(?:call|phone)\s+(?:me|us)?\s*(?:or|and|,)\s*(?:text|email|message)\b/,
+  /\b(?:do not|don't|dont|never)\s+(?:contact|reach out to|get in touch with)\s+(?:me|us)\b/,
+  /\b(?:do not|don't|dont|never)\s+(?:reach out|get in touch)\b(?!\s+(?:to|with)\s+(?:my|the)\b)/,
+  /\b(?:do not|don't|dont)\s+want\s+to\s+be\s+(?:contacted|reached)\b/,
+  /\b(?:do not|don't|dont|never)\s+(?:text|call|phone|email|message)\s+(?:me\s+|us\s+)?(?:or|and|nor|,)\s*(?:text|call|phone|email|message)\b/,
   /\b(?:stop|quit)\s+(?:contacting|calling|bothering)\b/,
   /\b(?:take|remove|delete)\s+me\s+(?:off|from)\b/,
   /\bleave me alone\b/,
   /\blose my number\b/,
-  /\bno (?:calls?|phone calls?)\b[^.?!]*\bno (?:texts?|texting|sms)\b/,
+  /\bno (?:phone )?calls?\s*(?:,|or|and|nor)\s*(?:no\s+)?(?:texts?|texting|sms)\b/,
+  /\bno (?:texts?|texting|sms)\s*(?:,|or|and|nor)\s*(?:no\s+)?(?:phone )?calls?\b/,
+  /\bno (?:phone )?calls?\b[^.?!]*\bno (?:texts?|texting|sms)\b/,
   /\bno (?:more )?(?:contact|follow[- ]?ups?)\b/,
 ];
+const BARE_STOP = ["stop", "stop it", "stop please", "please stop", "unsubscribe", "remove me"];
 const NO_TEXT = [
-  /\bno (?:more )?(?:texts?|texting|sms)\b/,
-  /\b(?:do not|don't|dont|never|please don't|stop)\s+(?:text|texting|sms)\b/,
+  new RegExp("\\bno (?:more )?(?:texts?|texting|sms)\\b(?!\\s+(?:to|on)\\s+" + SHOP + ")"),
+  new RegExp("\\b(?:do not|don't|dont|never|stop|can't|cannot)\\s+(?:text|texting|sms)\\b(?!\\s+(?:to\\s+)?" + SHOP + ")"),
   /\b(?:do not|don't|dont|never|stop)\s+send(?:ing)?\s+(?:me\s+)?(?:any\s+|a\s+)?(?:texts?|sms)\b/,
+  /\b(?:do not|don't|dont)\s+want\s+(?:any\s+|more\s+)?(?:texts?|texting|sms)\b/,
   /\b(?:not|never) by text\b/,
   /\b(?:rather|prefer)\s+not\s+(?:to\s+)?(?:get|receive|have)\s+(?:any\s+)?texts?\b/,
   /\bskip the texts?\b/,
   /\bcalls? only\b/,
 ];
 const NO_CALL = [
-  /\b(?:do not|don't|dont|never|please don't|stop)\s+(?:call|calling|phone)\b(?!\s+(?:the|my)\s+(?:shop|office|work|front))/,
+  new RegExp("\\b(?:do not|don't|dont|never|stop)\\s+(?:call|calling|phone)\\b(?!\\s+" + SHOP + ")"),
+  /\b(?:do not|don't|dont)\s+want\s+(?:any\s+|more\s+)?(?:phone\s+)?calls?\b/,
   /\bno (?:phone )?calls?\b/,
   /\btexts? only\b/,
 ];
+const TIME_LIMIT = /\b(?:before|after|until|till|unless|during|between|today|tonight|tomorrow|this week|next week|this month|on weekends?|at work|in the (?:morning|afternoon|evening)|mornings?|afternoons?|evenings?)\b/;
+const NO_OPPOSITION = [
+  /\bjust (?:exploring|looking|curious)\b/,
+  /\bnot ready\b/,
+  /\bget back to you\b/,
+  /\bthinking about it\b/,
+  /\b(?:call|phone)\s+(?:me|my cell|my mobile)\b/,
+  /\b(?:you|advisor|someone) can (?:call|text|phone)\b/,
+  /\bdon't mind (?:texts?|calls?)\b/,
+  /\b(?:texts?|phone calls?|calls?) (?:is|are) (?:fine|ok|okay|good)\b/,
+  /\btext (?:me|my cell)\b/,
+];
 
 export function readContactInstruction(ownerWords) {
-  const text = plain(ownerWords);
+  const text = plain(ownerWords).trim();
+  const bare = text.replace(/[.,!]/g, "").trim();
   const hit = (rules) => rules.some((r) => r.test(text));
-  if (hit(FULL_STOP)) return { kind: "no_contact", call: "block", sms: "block" };
-  const sms = hit(NO_TEXT) ? "block" : "allow";
-  const call = hit(NO_CALL) ? "block" : "allow";
-  if (sms === "block" && call === "block") return { kind: "no_contact", call, sms };
-  if (sms === "block") return { kind: "no_texts", call, sms };
-  if (call === "block") return { kind: "no_calls", call, sms };
-  return { kind: "none", call, sms };
+  const full = hit(FULL_STOP) || BARE_STOP.includes(bare);
+  const noText = hit(NO_TEXT);
+  const noCall = hit(NO_CALL);
+  if ((full || noText || noCall) && TIME_LIMIT.test(text)) return { kind: "unclear", call: "hold", sms: "hold" };
+  if (full || (noText && noCall)) return { kind: "no_contact", call: "block", sms: "block" };
+  if (noText) return { kind: "no_texts", call: "allow", sms: "block" };
+  if (noCall) return { kind: "no_calls", call: "block", sms: "allow" };
+  if (hit(NO_OPPOSITION)) return { kind: "none", call: "allow", sms: "allow" };
+  return { kind: "unclear", call: "hold", sms: "hold" };
 }
 
 // The CRM update each instruction produces. "No texts" leaves the global flag alone.
@@ -103,12 +128,14 @@ export function dndPayload(instruction) {
 }
 
 // ---------- The output guard: runs after a reply is generated, before it can be spoken ----------
+// A list of patterns, not a proof. replay.mjs holds the sentences it has been tried against.
 
 const NUM_WORD = "zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|half|point|and|a";
 const AMOUNT = new RegExp("\\b(?:(?:" + NUM_WORD + "|\\d[\\d,]*(?:\\.\\d+)?)[ -]+)+(?:million|thousand|grand|mil)\\b|\\b\\d[\\d,.]*\\s*(?:m|k)\\b|\\b\\d{1,3}(?:,\\d{3})+\\b", "g");
 const MULTIPLE = /\b(?:\d+(?:\.\d+)?|one|two|three|four|five|six|seven|eight|nine|ten)(?:\s*(?:to|or|-)\s*(?:\d+(?:\.\d+)?|one|two|three|four|five|six|seven|eight|nine|ten))?\s*(?:x\b|times\b)/;
-const PRICE_WORD = /\b(?:worth|sells? for|sell it for|sale price|selling price|asking price|price|priced|valued?|valuation|fetch|go for|get for|bring in|offer)\b/;
+const PRICE_WORD = /\b(?:worth|sells? for|sell it for|sale price|selling price|asking price|price|priced|valued?|valuation|fetch|go for|get for|bring in|offer|pay|pays|paid)\b/;
 const NEGATED = /\b(?:not|no|can't|cannot|won't|doesn't|does not|isn't|don't|do not|unable|never)\b/;
+const SELL_TALK = /\b(?:sell|sells|selling|worth|price|value|get for|go for)\b/;
 
 function amountsIn(text) {
   return (text.match(AMOUNT) || []).map((a) => a.trim().replace(/^(?:a|and)\s+(?=[a-z\d]+\s)/, ""));
@@ -117,25 +144,41 @@ function amountsIn(text) {
 export function proposesPrice(ownerWords, declared) {
   const text = plain(ownerWords);
   if (MULTIPLE.test(text)) return true;
-  return amountsIn(text).some((a) => a !== declared);
+  const amounts = amountsIn(text);
+  if (amounts.some((a) => a !== declared)) return true;
+  return amounts.length > 0 && SELL_TALK.test(text);
 }
 
+// Saying that a promise cannot be made is not a promise.
+const HONEST_REFUSAL = /\b(?:can't|cannot|can not|won't|unable to|not able to)\s+(?:promise|guarantee|say)\b[^.?!]*/g;
+
+const SECRECY = [
+  /\b(?:no one|nobody|none of them|your (?:staff|team|employees)|they)\b[^.?!]*\b(?:will|would|won't|will not|'ll|never)\b[^.?!]*\b(?:find out|know|hear|learn)\b/,
+  /\b(?:i|we) (?:can |will |do )?(?:guarantee|promise)\b|\bguaranteed\b|\b(?:completely confidential|totally confidential|fully confidential|strictly confidential|100 percent|stays? between (?:us|you and me|you and i)|nothing\s+is\s+shared|never\s+(?:be\s+)?shared)\b/,
+  /\b(?:we|i)\s+(?:won't|will not|never|wouldn't|would never)\s+(?:tell|share|disclose|mention|say)\b/,
+  /\b(?:keep|keeps|kept)\b[^.?!]*\b(?:private|secret|confidential)\b|\b(?:all|everything|always)\s+(?:is\s+|stays\s+|remains\s+)?(?:confidential|private|secret)\b/,
+];
 const BLOCKS = [
-  { reason: "promises secrecy", re: /\b(?:no one|nobody|none of them|your (?:staff|team|employees)|they)\b[^.?!]*\b(?:will|would|won't|will not|'ll|never)\b[^.?!]*\b(?:find out|know|hear|learn)\b/ },
-  { reason: "promises secrecy", re: /\b(?:i|we) (?:can |will |do )?(?:guarantee|promise)\b|\bguaranteed\b|\b(?:completely confidential|totally confidential|fully confidential|strictly confidential|100 percent|stays? between us|nothing\s+is\s+shared|never\s+(?:be\s+)?shared)\b/ },
-  { reason: "promises secrecy", re: /\b(?:keep|keeps|kept)\b[^.?!]*\b(?:private|secret|confidential)\b|\b(?:all|everything|always)\s+(?:is\s+|stays\s+|remains\s+)?(?:confidential|private|secret)\b/ },
-  { reason: "gives tax or legal advice", re: /\b(?:capital gains|tax (?:bill|rate|advice|break|hit|strategy|benefit)s?|write[- ]?offs?|deduct(?:ion|ible)?s?|asset sale|stock sale|s corp|c corp|llc|legally|you should restructure|structure the (?:sale|deal))\b/ },
-  { reason: "asks for documents", re: /\b(?:send|bring|upload|email|share|forward|gather|pull together|have ready)\b[^.?!]*\b(?:tax returns?|financials|p&l|profit and loss|statements?|documents?|paperwork)\b/ },
+  { reason: "gives tax or legal advice", re: /\b(?:capital gains|tax (?:bill|rate|advice|break|hit|strategy|benefit)s?|write[- ]?offs?|deduct(?:ion|ible)?s?|asset sale|stock sale|s corp|c corp|llc|legally|you should restructure|structure the (?:sale|deal)|holding company|set (?:it|the company|this) up as)\b|\b(?:pay less|lower|reduce|save|minimi[sz]e)\b[^.?!]*\btax(?:es)?\b/ },
+  { reason: "asks for documents", re: /\b(?:send|bring|upload|email|share|forward|gather|pull together|have ready|have)\b[^.?!]*\b(?:tax returns?|returns|financials|p&l|profit and loss|statements?|documents?|paperwork)\b/ },
   { reason: "cites a page aloud", re: /\b(?:article|our guide|our site|our website|blog post|podcast)\b/ },
   { reason: "uses a size bracket as a price", re: /\b(?:six|seven|eight)[- ]figures?\b/ },
+  { reason: "states a value", re: /\b(?:value|price|sell|list|worth)\b[^.?!]*\b(?:at|for|around|about)\s+(?:about\s+|around\s+|roughly\s+)?(?:\d|one|two|three|four|five|six|seven|eight|nine|ten)\b/, negatable: true },
+  { reason: "states a value", re: /\b(?:worth|value|valued|sell|sells|priced)\b[^.?!]*\b(?:what you do in sales|your (?:sales|revenue|earnings))\b/, negatable: true },
 ];
 
 export function checkReply(reply, ctx) {
   const context = ctx || {};
   const declared = context.declared || "";
   const text = plain(reply);
+  const withoutRefusals = text.replace(HONEST_REFUSAL, "");
+  if (SECRECY.some((re) => re.test(withoutRefusals))) return { ok: false, reason: "promises secrecy" };
   for (const block of BLOCKS) {
-    if (block.re.test(text)) return { ok: false, reason: block.reason };
+    if (!block.negatable) {
+      if (block.re.test(text)) return { ok: false, reason: block.reason };
+      continue;
+    }
+    if (clauses(text).some((c) => block.re.test(c) && !NEGATED.test(c))) return { ok: false, reason: block.reason };
   }
   if (text.includes(DOLLAR)) return { ok: false, reason: "states a currency amount" };
   if (MULTIPLE.test(text) || /\bmultiple (?:of|on|for|would|is|applied)\b|\byour multiple\b/.test(text)) return { ok: false, reason: "applies a multiple" };
@@ -149,18 +192,19 @@ export function checkReply(reply, ctx) {
     if (amounts.length === 1) {
       const isRestatement = /\b(?:in|of)\s+(?:annual\s+|yearly\s+)?(?:sales|revenue)\b/.test(sentence);
       if (!isRestatement) return { ok: false, reason: "states an amount without saying it is sales" };
-      if (clauses(sentence).some((c) => PRICE_WORD.test(c) && !NEGATED.test(c))) return { ok: false, reason: "ties sales to a sale price" };
+      if (clauses(sentence).some((c) => PRICE_WORD.test(c) && !NEGATED.test(c) && !c.startsWith("because"))) return { ok: false, reason: "ties sales to a sale price" };
     }
     for (const clause of clauses(sentence)) {
       const withoutAsking = clause.replace(/\bwhat (?:you|it|your business|the business|a business) (?:could|might|would|can) (?:sell|go) for\b/g, "");
-      const predicts = /\b(?:you|you'd|it|it'd|your (?:business|company)|this business)\b[^.?!]*\b(?:could|should|would|will|might|may|can|'d)\s*(?:probably\s+|likely\s+|easily\s+)?(?:sell for|fetch|bring|be worth|go for|get)\b/.test(withoutAsking)
+      const predicts = /\b(?:you|you'd|it|it'd|it's|your (?:business|company)|this business)\b[^.?!]*\b(?:could|should|would|will|might|may|can|'d)\s*(?:probably\s+|likely\s+|easily\s+)?(?:sell for|fetch|bring|be worth|go for|get)\b/.test(withoutAsking)
         || /\b(?:businesses|companies|shops|firms)\b[^.?!]*\b(?:sells?|go|goes|trades?)\s+(?:for|at)\b/.test(withoutAsking)
+        || /\b(?:it's|it is)\s+(?:probably\s+|likely\s+)?worth\b/.test(withoutAsking)
         || /\b(?:a year's|one year's|annual)\s+(?:sales|revenue|earnings|profit)\b/.test(withoutAsking);
       if (predicts && !NEGATED.test(withoutAsking)) return { ok: false, reason: "predicts a sale price" };
     }
   }
   if (context.lastOwner && proposesPrice(context.lastOwner, declared)) {
-    const endorses = /\b(?:yes|yeah|yep|sure|correct|exactly|right|fair|true|agreed|absolutely|definitely|probably|likely|reasonable|ballpark|neighborhood|close|in the range|on track|not far off|that works|makes sense|good estimate|solid estimate|sounds good)\b/;
+    const endorses = /\b(?:yes|yeah|yep|sure|correct|exactly|right|fair|true|agreed|absolutely|definitely|probably|likely|reasonable|ballpark|neighborhood|close|in the range|on track|not far off|that works|makes sense|good estimate|solid estimate|sounds good|what i'd expect|what i would expect)\b/;
     for (const sentence of sentences(text)) {
       if (endorses.test(sentence) && !NEGATED.test(sentence)) return { ok: false, reason: "endorses the owner's price" };
     }
@@ -244,23 +288,33 @@ function versionFor(path) {
   return path.startsWith("/calendars") || path.startsWith("/conversations") ? "2021-04-15" : "2021-07-28";
 }
 
-export function makeClient(transport, log) {
-  const ledger = new Map();
+export function makeClient(transport, log, sharedLedger) {
+  const ledger = sharedLedger || new Map();
   async function send(method, path, payload) {
     const request = {
       headers: { authorization: "Bearer mock-token", version: versionFor(path) },
       body: payload && payload.body, query: payload && payload.query,
     };
-    const response = await transport(method, path, request);
+    let response;
+    try {
+      response = await transport(method, path, request);
+    } catch (error) {
+      response = { status: 503, body: { message: "no answer from the CRM" } };
+    }
     log.push({ method, path, version: request.headers.version, query: request.query, body: request.body, status: response.status, response: response.body });
     return response;
   }
-  // The API documents no idempotency header, so a retried event is caught here, by call and action.
-  async function once(key, method, path, payload) {
+  // The API documents no idempotency header, so a repeated event is caught here, by call and action.
+  // The promise goes in the ledger before the answer comes back, so two events in flight send one request.
+  // The ledger lives in memory: a restart forgets it.
+  function once(key, method, path, payload) {
     if (ledger.has(key)) return ledger.get(key);
-    const response = await send(method, path, payload);
-    if (response.status < 300) ledger.set(key, response);
-    return response;
+    const pending = send(method, path, payload).then((response) => {
+      if (response.status >= 300) ledger.delete(key);
+      return response;
+    });
+    ledger.set(key, pending);
+    return pending;
   }
   return { send, once };
 }
@@ -268,83 +322,145 @@ export function makeClient(transport, log) {
 // ---------- The call ----------
 
 // Replays the part of the call heard so far against a CRM, then applies what the owner asked for.
-// heard: the turn ids heard. ownerWords: the words of her final answer, or null if she has not given one.
-export async function runCall(conversation, heard, ownerWords, transport) {
+// heard: the turn ids heard to the end. ownerWords: her final answer, or null if she has not given one.
+// options.saying: { id, text }, the owner turn in progress and the words said so far.
+// options.callId and options.ledger: for a repeated event or a later call.
+// Nothing is written until there is a number to match on, or a final answer to record.
+export async function runCall(conversation, heard, ownerWords, transport, options) {
+  const opts = options || {};
   const log = [];
-  const client = makeClient(transport, log);
-  const call = SCENE.callId;
+  const client = makeClient(transport, log, opts.ledger);
+  const call = opts.callId || SCENE.callId;
+  const saying = opts.saying || null;
   const { fields, problems } = readExtraction(conversation.extraction, conversation.turns);
-  const knows = (key) => fields[key] && heard.includes(fields[key].turn);
-  const result = { fields, problems, log, heardFields: {}, contactId: null, opportunityId: null, stageId: null, attempts: [], instruction: null };
-  for (const key of Object.keys(fields)) if (typeof fields[key] === "string" ? knows("name") : knows(key)) result.heardFields[key] = fields[key];
-
-  if (!knows("name")) return result;
-
-  const upsert = await client.once(call + ":contact", "POST", "/contacts/upsert", {
-    body: { locationId: SCENE.locationId, firstName: fields.name.first, lastName: fields.name.last, source: "Simulated inbound call", timezone: SCENE.timezone },
-  });
-  const contactId = upsert.body.contact.id;
-  result.contactId = contactId;
-
-  const opportunity = await client.once(call + ":opportunity", "POST", "/opportunities/", {
-    body: {
-      pipelineId: SCENE.pipelineId, locationId: SCENE.locationId, contactId, status: "open", pipelineStageId: "stage_new_inbound",
-      name: fields.name.first + " " + fields.name.last + ", " + (fields.sector || "owner") + " inbound",
-    },
-  });
-  result.opportunityId = opportunity.body.opportunity.id;
-  result.stageId = "stage_new_inbound";
-
-  if (knows("sales")) {
-    await client.once(call + ":declared-sales", "PUT", "/contacts/" + contactId, {
-      body: { customFields: [{ id: "field_declared_sales", field_value: fields.sales.phrase }, { id: "field_sale_horizon", field_value: fields.horizon || "" }] },
-    });
+  const nameTurn = fields.name ? fields.name.turn : null;
+  const knows = (key) => {
+    const field = fields[key];
+    if (!field) return false;
+    if (heard.includes(field.turn)) return true;
+    return Boolean(saying && saying.id === field.turn && READERS[key + "_turn"](saying.text));
+  };
+  const labelSaid = (label) => heard.includes(nameTurn) || Boolean(saying && saying.id === nameTurn && saying.text.toLowerCase().includes(label.toLowerCase()));
+  const result = {
+    fields, problems, log, heardFields: {}, contactId: null, opportunityId: null, stageId: null, attempts: [],
+    instruction: null, preferenceRecorded: null, taskBody: null, crmFailed: false, ownerWords: ownerWords || null,
+  };
+  for (const key of Object.keys(fields)) {
+    if (typeof fields[key] === "string" ? labelSaid(fields[key]) : knows(key)) result.heardFields[key] = fields[key];
   }
-  if (knows("price_question")) {
-    await client.once(call + ":price-question", "POST", "/contacts/" + contactId + "/notes", { body: { title: "Question to handle", body: fields.price_question.question } });
-    await client.once(call + ":stage-review", "PUT", "/opportunities/" + result.opportunityId, { body: { pipelineStageId: "stage_advisor_review" } });
-    result.stageId = "stage_advisor_review";
-  }
-  if (knows("recurring")) {
-    await client.once(call + ":recurring", "POST", "/contacts/" + contactId + "/notes", { body: { title: "Recurring work", body: fields.recurring.phrase } });
-  }
-  if (knows("cell")) {
-    await client.once(call + ":cell", "PUT", "/contacts/" + contactId, { body: { phone: fields.cell.e164 } });
-  }
-  if (ownerWords === null || ownerWords === undefined) return result;
 
-  const instruction = readContactInstruction(ownerWords);
+  const finalAnswer = ownerWords !== null && ownerWords !== undefined;
+  if (!knows("cell") && !finalAnswer) return result;
+
+  const fail = (response) => {
+    if (response.status >= 300) result.crmFailed = true;
+    return response.status < 300;
+  };
+  const instruction = finalAnswer ? readContactInstruction(ownerWords) : null;
   result.instruction = instruction;
-  const update = dndPayload(instruction);
-  if (update) await client.once(call + ":dnd", "PUT", "/contacts/" + contactId, { body: update });
-  const stageId = instruction.kind === "no_contact" ? "stage_no_contact" : "stage_advisor_callback";
-  await client.once(call + ":stage-final", "PUT", "/opportunities/" + result.opportunityId, {
-    body: instruction.kind === "no_contact" ? { pipelineStageId: stageId, status: "abandoned" } : { pipelineStageId: stageId },
-  });
-  result.stageId = stageId;
 
-  // Every call plans the same two follow-ups. Each one reads the contact back first, then either runs or stops.
-  const contact = (await client.send("GET", "/contacts/" + contactId)).body.contact;
-  if (dndBlocks(contact, "SMS")) {
-    result.attempts.push({ channel: "text", outcome: "blocked", sent: false });
+  const contactBody = { locationId: SCENE.locationId, source: "Simulated inbound call", timezone: SCENE.timezone };
+  if (fields.name) Object.assign(contactBody, { firstName: fields.name.first, lastName: fields.name.last });
+  if (knows("cell")) contactBody.phone = fields.cell.e164;
+  const upsert = await client.once(call + ":contact", "POST", "/contacts/upsert", { body: contactBody });
+  let contactId = null;
+  if (fail(upsert)) {
+    contactId = upsert.body.contact.id;
+    result.contactId = contactId;
+    const who = fields.name ? fields.name.first + " " + fields.name.last : "Owner";
+    const opportunity = await client.once(call + ":opportunity", "POST", "/opportunities/", {
+      body: { pipelineId: SCENE.pipelineId, locationId: SCENE.locationId, contactId, status: "open", pipelineStageId: "stage_new_inbound", name: who + ", " + (fields.sector || "owner") + " inbound" },
+    });
+    if (fail(opportunity)) {
+      result.opportunityId = opportunity.body.opportunity.id;
+      result.stageId = "stage_new_inbound";
+    }
+    if (knows("sales")) {
+      fail(await client.once(call + ":declared-sales", "PUT", "/contacts/" + contactId, {
+        body: { customFields: [{ id: "field_declared_sales", field_value: fields.sales.phrase }, { id: "field_sale_horizon", field_value: fields.horizon || "" }] },
+      }));
+    }
+    if (knows("price_question")) {
+      fail(await client.once(call + ":price-question", "POST", "/contacts/" + contactId + "/notes", { body: { title: "Question to handle", body: fields.price_question.question } }));
+      if (result.opportunityId && fail(await client.once(call + ":stage-review", "PUT", "/opportunities/" + result.opportunityId, { body: { pipelineStageId: "stage_advisor_review" } }))) {
+        result.stageId = "stage_advisor_review";
+      }
+    }
+    if (knows("recurring")) {
+      fail(await client.once(call + ":recurring", "POST", "/contacts/" + contactId + "/notes", { body: { title: "Recurring work", body: fields.recurring.phrase } }));
+    }
+  }
+  if (!finalAnswer) return result;
+
+  const update = dndPayload(instruction);
+  if (update) {
+    const saved = contactId ? await client.once(call + ":dnd", "PUT", "/contacts/" + contactId, { body: update }) : { status: 503 };
+    result.preferenceRecorded = fail(saved);
+  }
+  if (instruction.kind === "unclear" && contactId) {
+    fail(await client.once(call + ":unclear", "POST", "/contacts/" + contactId + "/notes", { body: { title: "Last answer, for an advisor to read", body: ownerWords } }));
+  }
+  const stageId = instruction.kind === "no_contact" ? "stage_no_contact" : instruction.kind === "unclear" ? "stage_advisor_review" : "stage_advisor_callback";
+  if (result.opportunityId) {
+    const moved = await client.once(call + ":stage-final", "PUT", "/opportunities/" + result.opportunityId, {
+      body: instruction.kind === "no_contact" ? { pipelineStageId: stageId, status: "abandoned" } : { pipelineStageId: stageId },
+    });
+    if (fail(moved)) result.stageId = stageId;
+  }
+
+  // Every call plans the same two follow-ups. Her words stop them here even if the CRM write failed.
+  // Each one also reads the contact back, so an opposition from an earlier call still holds.
+  const readBack = contactId ? await client.send("GET", "/contacts/" + contactId) : { status: 503 };
+  const contact = fail(readBack) ? readBack.body.contact : null;
+  const gate = (mine, channel) => {
+    if (mine === "hold") return "held";
+    if (mine === "block" || (contact && dndBlocks(contact, channel))) return "blocked";
+    return contact ? "go" : "not_run";
+  };
+
+  const textGate = gate(instruction.sms, "SMS");
+  if (textGate !== "go") {
+    result.attempts.push({ channel: "text", outcome: textGate, sent: false });
   } else {
     const sms = await client.once(call + ":text", "POST", "/conversations/messages", {
       body: { type: "SMS", subType: {}, contactId, status: "pending", message: "Thanks for calling. An advisor has your notes." },
     });
-    result.attempts.push({ channel: "text", outcome: sms.status < 300 ? "sent" : "failed", sent: sms.status < 300 });
+    result.attempts.push({ channel: "text", outcome: fail(sms) ? "sent" : "failed", sent: sms.status < 300 });
   }
-  if (dndBlocks(contact, "Call")) {
-    result.attempts.push({ channel: "callback", outcome: "blocked", sent: false });
+
+  const callGate = gate(instruction.call, "Call");
+  if (callGate !== "go") {
+    result.attempts.push({ channel: "callback", outcome: callGate, sent: false });
   } else {
+    const reader = fields.shop_line ? fields.shop_line.reader : null;
+    const number = fields.cell ? "Call her cell, " + fields.cell.display + (reader ? ", not the shop line. Her " + reader + " reads those texts." : ".") : "No number given.";
+    const first = fields.name ? fields.name.first : "the owner";
     const task = await client.once(call + ":callback", "POST", "/contacts/" + contactId + "/tasks", {
-      body: { title: "Call " + fields.name.first + " on her cell", body: "Number: " + (fields.cell ? fields.cell.display : "none given"), dueDate: SCENE.callbackDue, completed: false },
+      body: { title: "Call " + first, body: number, dueDate: SCENE.callbackDue, completed: false },
     });
-    result.attempts.push({ channel: "callback", outcome: task.status < 300 ? "created" : "failed", sent: task.status < 300 });
+    const created = fail(task);
+    result.attempts.push({ channel: "callback", outcome: created ? "created" : "failed", sent: created });
+    if (created) {
+      const stored = await client.send("GET", "/contacts/" + contactId + "/tasks");
+      if (fail(stored)) {
+        const found = stored.body.tasks.find((t) => t.id === task.body.task.id);
+        result.taskBody = found ? found.body : null;
+      }
+    }
   }
   return result;
 }
 
 // ---------- The card the advisor opens ----------
+
+const TEXT_LINE = {
+  blocked: "Text attempt stopped, nothing sent.", sent: "Text sent.", failed: "Text failed, nothing sent.",
+  held: "No automatic text.", not_run: "Text not tried, the CRM did not answer.",
+};
+const CALLBACK_LINE = {
+  blocked: "No callback task.", created: "Callback task open.", failed: "Callback task could not be created.",
+  held: "No callback task.", not_run: "No callback task, the CRM did not answer.",
+};
 
 export function cardFrom(run, conversation) {
   const f = run.heardFields;
@@ -364,27 +480,38 @@ export function cardFrom(run, conversation) {
     recurring: f.recurring ? f.recurring.phrase : null,
     question: f.price_question ? f.price_question.question : null,
     questionAt: f.price_question ? at(f.price_question.turn) : null,
-    number: null, numberNote: null, followUp: null, stamp: null,
+    number: null, numberLine: null, task: run.taskBody, followUp: null, stamp: null, warning: null,
     stage: run.stageId ? STAGES[run.stageId] : null,
     valuation: null,
   };
   if (f.cell) {
     card.number = f.cell.display;
-    card.numberNote = reader ? "Her cell. Not the shop line, her " + reader + " reads those texts." : "Her cell.";
+    card.numberLine = f.cell.display + ". Her cell." + (reader ? " Not the shop line, her " + reader + " reads those texts." : "");
   }
-  if (kind === "no_contact") {
+  if (run.taskBody) card.numberLine = run.taskBody;
+  if (!text || !callback) return card;
+
+  const stopped = text.outcome === "blocked" && callback.outcome === "blocked";
+  if (stopped) {
+    const later = run.ownerWords && /\bget back to you\b/i.test(run.ownerWords) ? " She will get back to the firm herself." : "";
     card.number = "None";
-    card.numberNote = "She asked not to be contacted. She will get back to the firm herself.";
-    card.followUp = "No callback task. Text attempt stopped, nothing sent.";
+    card.numberLine = "None. She asked not to be contacted." + later;
     card.stamp = "Do not contact";
-  } else if (kind === "no_texts") {
-    card.followUp = (text && text.outcome === "blocked" ? "Text attempt stopped, nothing sent." : "Text sent.") + " " + (callback && callback.outcome === "created" ? "Callback task open." : "No callback task.");
+  } else if (text.outcome === "blocked") {
     card.stamp = "No texts";
-  } else if (kind === "no_calls") {
-    card.followUp = "Callback stopped, no task. " + (text && text.sent ? "Text sent." : "No text sent.");
+  } else if (callback.outcome === "blocked") {
     card.stamp = "No calls";
-  } else if (kind === "none") {
-    card.followUp = (text && text.sent ? "Text sent." : "No text sent.") + " " + (callback && callback.outcome === "created" ? "Callback task open." : "No callback task.");
+  } else if (kind === "unclear") {
+    card.stamp = "Review";
+  }
+  const lines = callback.outcome === "blocked" ? [CALLBACK_LINE[callback.outcome], TEXT_LINE[text.outcome]] : [TEXT_LINE[text.outcome], CALLBACK_LINE[callback.outcome]];
+  card.followUp = kind === "unclear" ? "No automatic follow-up. Her last answer needs an advisor's review." : lines.join(" ");
+  if (run.preferenceRecorded === false) {
+    card.warning = "Her request could not be saved in the CRM. Check it before anyone follows up.";
+    card.followUp = card.warning + " " + card.followUp;
+  } else if (run.crmFailed && !run.contactId) {
+    card.warning = "The CRM did not answer. Nothing was saved.";
+    card.followUp = card.warning + " " + card.followUp;
   }
   return card;
 }
@@ -394,20 +521,37 @@ export function clock(seconds) {
   return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
 }
 
+// The words of a turn said by this moment of the audio, cut at a word. Speech is close enough to
+// even within one short turn for this to fill the card as she talks.
+export function textSoFar(turn, now) {
+  if (now >= turn.end) return turn.text;
+  if (now <= turn.start) return "";
+  const n = Math.floor((turn.text.length * (now - turn.start)) / (turn.end - turn.start));
+  if (turn.text[n] === " ") return turn.text.slice(0, n);
+  return turn.text.slice(0, Math.max(turn.text.lastIndexOf(" ", n), 0));
+}
+
 // ---------- If she picks a time herself ----------
 
-const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+function slotParts(iso) {
+  const format = new Intl.DateTimeFormat("en-US", { timeZone: SCENE.timezone, weekday: "long", month: "long", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true });
+  const parts = Object.fromEntries(format.formatToParts(new Date(iso)).map((p) => [p.type, p.value]));
+  return {
+    date: parts.weekday + ", " + parts.month + " " + parts.day,
+    time: parts.hour + ":" + parts.minute + " " + (parts.dayPeriod.toUpperCase() === "AM" ? "a.m." : "p.m."),
+  };
+}
 
 export function speakSlot(iso) {
-  const [date, time] = iso.split("T");
-  const [y, m, d] = date.split("-").map(Number);
-  const weekday = DAYS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
-  let hour = Number(time.slice(0, 2));
-  const minutes = time.slice(3, 5);
-  const suffix = hour >= 12 ? "p.m." : "a.m.";
-  if (hour > 12) hour -= 12;
-  return weekday + ", " + MONTHS[m - 1] + " " + d + " at " + hour + ":" + minutes + " " + suffix;
+  const p = slotParts(iso);
+  return p.date + " at " + p.time;
+}
+
+// Says the date once when the times offered fall on the same day.
+export function speakSlots(slots) {
+  const parts = slots.map(slotParts);
+  if (parts.every((p) => p.date === parts[0].date)) return parts[0].date + " at " + parts.map((p) => p.time).join(" or ");
+  return slots.map(speakSlot).join(" or ");
 }
 
 // She asks for a slot she was offered. Someone else takes it first. The assistant says nothing is
@@ -416,13 +560,13 @@ export async function runBooking(transport) {
   const log = [];
   const client = makeClient(transport, log);
   const spoken = [];
-  const key = SCENE.callId + ":appointment";
+  const key = (startTime) => SCENE.callId + ":appointment:" + startTime;
   const owner = (await client.send("POST", "/contacts/upsert", { body: { locationId: SCENE.locationId, firstName: "Dana", lastName: "Walker", phone: "+19185550142", timezone: SCENE.timezone } })).body.contact;
   const rival = (await client.send("POST", "/contacts/upsert", { body: { locationId: SCENE.locationId, firstName: "Other", lastName: "Caller", phone: "+19185550199", timezone: SCENE.timezone } })).body.contact;
 
   const readSlots = async () => {
     const days = (await client.send("GET", "/calendars/" + SCENE.calendarId + "/free-slots", {
-      query: { startDate: Date.UTC(2026, 10, 17), endDate: Date.UTC(2026, 10, 18), timezone: SCENE.timezone },
+      query: { startDate: Date.parse("2026-11-17T00:00:00-06:00"), endDate: Date.parse("2026-11-18T00:00:00-06:00"), timezone: SCENE.timezone },
     })).body;
     return Object.values(days).flatMap((d) => d.slots);
   };
@@ -430,35 +574,34 @@ export async function runBooking(transport) {
     body: { calendarId: SCENE.calendarId, locationId: SCENE.locationId, contactId, startTime, title: "Confidential call with an advisor" },
   });
 
-  const offerLine = (slots, lead) => lead + slots.slice(0, 2).map(speakSlot).join(" or ") + ", Central time.";
-  const noTime = "I could not find an open time. An advisor will call you with one.";
+  const noTime = "I could not find an open time, so nothing is booked.";
   const offered = await readSlots();
   if (!offered.length) {
     spoken.push({ who: "assistant", line: noTime });
     return { spoken, appointment: null, retried: null, log, firstAttemptStatus: null };
   }
   const chosen = offered[0];
-  spoken.push({ who: "assistant", line: offerLine(offered, "I can offer ") });
+  spoken.push({ who: "assistant", line: "I can offer " + speakSlots(offered.slice(0, 2)) + ", Central time." });
   spoken.push({ who: "owner", line: "The first one, please." });
 
   await book(rival.id, chosen, "another-call:appointment");
-  const first = await book(owner.id, chosen, key);
+  const first = await book(owner.id, chosen, key(chosen));
   let appointment = null;
   if (first.status < 300 && first.body.id) {
     appointment = first.body;
   } else {
     const fresh = await readSlots();
     if (fresh.length) {
-      spoken.push({ who: "assistant", line: offerLine(fresh.slice(0, 1), "That time was just taken. I can offer ") });
+      spoken.push({ who: "assistant", line: "That time was just taken. I can offer " + speakSlots(fresh.slice(0, 1)) + " instead, Central time." });
       spoken.push({ who: "owner", line: "That works." });
-      const second = await book(owner.id, fresh[0], key);
+      const second = await book(owner.id, fresh[0], key(fresh[0]));
       if (second.status < 300 && second.body.id) appointment = second.body;
     }
   }
   if (appointment) spoken.push({ who: "assistant", line: "You are booked for " + speakSlot(appointment.startTime) + ", Central time.", afterId: appointment.id });
   else spoken.push({ who: "assistant", line: noTime });
 
-  const retried = appointment ? await book(owner.id, appointment.startTime, key) : null;
+  const retried = appointment ? await book(owner.id, appointment.startTime, key(appointment.startTime)) : null;
   return { spoken, appointment, retried: retried ? retried.body : null, log, firstAttemptStatus: first.status };
 }
 

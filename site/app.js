@@ -1,4 +1,4 @@
-import { BOOKING_SLOTS, cardFrom, clock, runBooking, runCall } from "./lib/engine.js";
+import { BOOKING_SLOTS, cardFrom, clock, runBooking, runCall, textSoFar } from "./lib/engine.js";
 import { createMockCrm } from "./lib/mockcrm.js";
 
 const byId = (id) => document.getElementById(id);
@@ -10,7 +10,8 @@ const narrow = () => window.matchMedia("(max-width: 620px)").matches;
 const [contracts, conversation] = await Promise.all(
   ["data/contracts.json", "data/conversation.json"].map((u) => fetch(u).then((r) => r.json())));
 
-const state = { heard: [], choice: null, listened: false, renderId: 0, lastStamp: null };
+const BRANCH_GAP = 0.45;
+const state = { heard: [], saying: null, choice: null, listened: false, branchOn: false, renderId: 0, lastStamp: null, lastKey: "" };
 const typing = new WeakMap();
 
 function localTransport() {
@@ -61,7 +62,7 @@ function renderCard(card, run) {
   typeInto(byId("card-name"), card.name);
   typeInto(byId("card-stage"), card.stage);
   typeInto(byId("f-question"), card.question ? card.question + " (at " + card.questionAt + ")" : "");
-  typeInto(byId("f-number"), card.number ? card.number + ". " + card.numberNote : "");
+  typeInto(byId("f-number"), card.numberLine);
   byId("f-number").classList.toggle("number-none", card.number === "None");
   typeInto(byId("f-followup"), card.followUp);
   typeInto(byId("f-valuation"), card.valuation);
@@ -75,10 +76,11 @@ function renderCard(card, run) {
   byId("tab-name").textContent = f.name ? f.name.last + ", " + f.name.first[0] + "." : "Owner inbound";
   typeInto(byId("slip-name"), card.name || " ");
   typeInto(byId("slip-phone"), f.cell ? f.cell.display : " ");
-  byId("box-telephoned").classList.toggle("ticked", Boolean(card.name));
+  byId("slip-phone").classList.toggle("struck", card.number === "None");
+  byId("box-telephoned").classList.toggle("ticked", state.listened || Boolean(state.choice));
   const callback = run.attempts.find((a) => a.channel === "callback");
   byId("box-please").classList.toggle("ticked", Boolean(callback && callback.sent));
-  byId("box-again").classList.toggle("ticked", Boolean(run.instruction && run.instruction.kind === "no_contact"));
+  byId("box-again").classList.toggle("ticked", card.number === "None");
 
   byId("request-count").textContent = run.log.length ? "(" + run.log.length + ")" : "";
   const list = byId("request-list");
@@ -100,7 +102,7 @@ function renderCard(card, run) {
 async function refresh() {
   const id = ++state.renderId;
   const branch = state.choice ? conversation.branches[state.choice] : null;
-  const run = await runCall(conversation, state.heard, branch ? branch.owner.text : null, localTransport());
+  const run = await runCall(conversation, state.heard, branch ? branch.owner.text : null, localTransport(), { saying: state.saying });
   if (id !== state.renderId) return;
   renderCard(cardFrom(run, conversation), run);
   renderTranscriptBranch();
@@ -130,12 +132,12 @@ function renderTranscriptBranch() {
   list.querySelectorAll("[data-branch]").forEach((n) => n.remove());
   if (!state.choice) return;
   const branch = conversation.branches[state.choice];
-  const offset = conversation.duration + 0.45;
   for (const turn of [branch.owner, branch.assistant]) {
-    const li = transcriptLine(turn, offset);
+    const li = transcriptLine(turn, conversation.duration + BRANCH_GAP);
     li.dataset.branch = "1";
     list.append(li);
   }
+  markBranchNow();
 }
 
 function markNow(id) {
@@ -146,76 +148,108 @@ function markNow(id) {
   }
 }
 
-// ---------- Playback ----------
+function markBranchNow() {
+  if (!state.branchOn || !state.choice || branchAudio.paused) return;
+  const branch = conversation.branches[state.choice];
+  const now = branchAudio.currentTime;
+  markNow(now < branch.owner.end + BRANCH_GAP ? branch.owner.id : branch.assistant.id);
+}
+
+// ---------- Playback: one button, one counter, whichever part of the call is playing ----------
+
+const active = () => (state.branchOn ? branchAudio : audio);
 
 function setLabels() {
-  const playing = !audio.paused && !audio.ended;
-  const midway = audio.currentTime > 0 && !audio.ended;
-  byId("play-label").textContent = playing ? "Pause" : midway ? "Keep listening" : "Hear the owner";
+  const seg = active();
+  const playing = !seg.paused && !seg.ended;
+  const midway = seg.currentTime > 0 && !seg.ended;
+  byId("play-label").textContent = playing ? "Pause" : midway ? "Keep listening" : seg.ended ? "Hear it again" : "Hear the owner";
   byId("play-glyph").setAttribute("d", playing ? "M4 3 H8 V17 H4 Z M12 3 H16 V17 H12 Z" : "M5 3 L17 10 L5 17 Z");
   byId("mini-play").textContent = playing ? "Pause" : "Play";
-  byId("minibar").hidden = !(narrow() && state.listened && !audio.ended && (playing || midway));
+  byId("minibar").hidden = !(narrow() && state.listened && !seg.ended && (playing || midway));
 }
 
 function setTime() {
-  const duration = conversation.duration;
-  const now = Math.min(audio.currentTime, duration);
-  byId("scrub").value = String((now / duration) * 100);
+  const total = conversation.duration;
+  const seg = active();
+  const now = state.branchOn ? total + BRANCH_GAP + seg.currentTime : Math.min(seg.currentTime, total);
+  const share = Math.min(now / total, 1) * 100;
+  byId("scrub").value = String(share);
   byId("time").textContent = clock(now);
   byId("mini-time").textContent = clock(now);
-  byId("mini-fill").style.width = (now / duration) * 100 + "%";
+  byId("mini-fill").style.width = share + "%";
 }
 
 function onTime() {
   setTime();
   const now = audio.currentTime;
-  const current = conversation.turns.find((t) => now >= t.start && now < t.end + 0.45);
+  const current = conversation.turns.find((t) => now >= t.start && now < t.end + BRANCH_GAP);
   if (!audio.paused) markNow(current ? current.id : null);
   if (state.choice) return;
   const heard = conversation.turns.filter((t) => t.end <= now + 0.05).map((t) => t.id);
-  if (heard.length !== state.heard.length) {
+  const speaking = conversation.turns.find((t) => t.speaker === "owner" && now >= t.start && now < t.end);
+  const saying = speaking ? { id: speaking.id, text: textSoFar(speaking, now) } : null;
+  const key = heard.length + "|" + (saying ? saying.text : "");
+  if (key !== state.lastKey) {
+    state.lastKey = key;
     state.heard = heard;
+    state.saying = saying;
     refresh();
   }
 }
 
-function start() {
+function clearChoice() {
+  state.choice = null;
+  state.branchOn = false;
+  state.heard = [];
+  state.saying = null;
+  state.lastKey = "";
+  document.querySelectorAll('input[name="choice"]').forEach((i) => (i.checked = false));
+}
+
+function startCall() {
   branchAudio.pause();
-  if (audio.ended || audio.currentTime === 0) {
+  if (state.choice || audio.ended) {
     audio.currentTime = 0;
     clearChoice();
   }
+  state.branchOn = false;
   state.listened = true;
   byId("choice").classList.remove("due");
+  refresh();
   audio.play();
   if (narrow()) byId("card").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
 }
 
 function toggle() {
-  if (audio.paused || audio.ended) start();
-  else audio.pause();
-}
-
-function clearChoice() {
-  state.choice = null;
-  state.heard = [];
-  document.querySelectorAll('input[name="choice"]').forEach((i) => (i.checked = false));
-  refresh();
+  const seg = active();
+  if (!seg.paused && !seg.ended) {
+    seg.pause();
+    return;
+  }
+  if (state.branchOn && !seg.ended) {
+    seg.play();
+    return;
+  }
+  startCall();
 }
 
 function choose(key) {
   audio.pause();
+  branchAudio.pause();
   state.choice = key;
+  state.saying = null;
   state.heard = conversation.turns.map((t) => t.id);
   byId("choice").classList.remove("due");
   markNow(null);
   refresh();
-  const branch = conversation.branches[key];
   if (state.listened) {
-    branchAudio.src = branch.audio;
+    state.branchOn = true;
+    branchAudio.src = conversation.branches[key].audio;
     branchAudio.play();
   }
-  byId("minibar").hidden = true;
+  setLabels();
+  setTime();
   if (narrow()) byId("card").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
 }
 
@@ -226,12 +260,31 @@ audio.addEventListener("play", setLabels);
 audio.addEventListener("pause", setLabels);
 audio.addEventListener("ended", () => {
   state.heard = conversation.turns.map((t) => t.id);
-  if (!state.choice) byId("choice").classList.add("due");
+  state.saying = null;
   setLabels();
   markNow(null);
   refresh();
+  if (!state.choice) {
+    byId("choice").classList.add("due");
+    if (narrow()) byId("choice").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center" });
+  }
+});
+branchAudio.addEventListener("timeupdate", () => {
+  if (!state.branchOn) return;
+  setTime();
+  markBranchNow();
+});
+branchAudio.addEventListener("play", setLabels);
+branchAudio.addEventListener("pause", setLabels);
+branchAudio.addEventListener("ended", () => {
+  setLabels();
+  markNow(null);
 });
 byId("scrub").addEventListener("input", (event) => {
+  if (state.choice) {
+    branchAudio.pause();
+    clearChoice();
+  }
   audio.currentTime = (Number(event.target.value) / 100) * conversation.duration;
   onTime();
   setLabels();
@@ -274,7 +327,8 @@ async function renderSources() {
     const response = await fetch("sources.json");
     if (!response.ok) return;
     const data = await response.json();
-    const box = byId("sources");
+    const box = document.createElement("div");
+    box.className = "sources";
     const intro = document.createElement("p");
     intro.textContent = data.intro;
     const list = document.createElement("ul");
@@ -287,7 +341,7 @@ async function renderSources() {
       list.append(li);
     }
     box.append(intro, list);
-    box.hidden = false;
+    document.querySelector(".foot").prepend(box);
   } catch {
     // The file is not part of the repository. The page works without it.
   }

@@ -34,7 +34,7 @@ export default {
     const isAudio = path.endsWith(".mp3");
     const assetRequest = new Request(new URL(path, url.origin), { method: request.method, headers: isAudio ? {} : request.headers });
     const res = await env.ASSETS.fetch(assetRequest);
-    const served = isAudio && res.ok ? await withRange(res, request.headers.get("Range")) : res;
+    const served = isAudio && res.ok && request.method !== "HEAD" ? await withRange(res, request.headers.get("Range")) : res;
     const out = new Response(served.body, served);
     const loc = out.headers.get("Location");
     if (loc && loc.startsWith("/")) out.headers.set("Location", BASE + loc);

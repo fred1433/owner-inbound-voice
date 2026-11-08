@@ -20,7 +20,7 @@
   {
    "for": "A2",
    "attempt": 1,
-   "reply": "Sales alone don't tell us that, because buyers pay for what the business earns for its owner, and revenue doesn't show it. How much of your business comes from recurring maintenance contracts?",
+   "reply": "Not by itself, because buyers pay for what the business earns for its owner, and sales don't show that. How much of your work comes from recurring maintenance contracts?",
    "guard": {
     "ok": true,
     "reason": ""
@@ -32,7 +32,7 @@
   {
    "for": "A3",
    "attempt": 1,
-   "reply": "That's helpful, since buyers do look closely at recurring work like that. The next step is the firm's evaluation with an advisor, so what's the best number for them to reach you on?",
+   "reply": "That's helpful, since buyers look closely at recurring work like that. The next step is the firm's evaluation with an advisor, so what's the best number for an advisor to reach you on?",
    "guard": {
     "ok": true,
     "reason": ""
@@ -44,7 +44,7 @@
   {
    "for": "A4",
    "attempt": 1,
-   "reply": "Got it, your cell at nine one eight, five five five, oh one four two, and not the shop line. How would you like the advisor to follow up, if at all?",
+   "reply": "Got it, your cell is nine one eight, five five five, oh one four two. How would you like the advisor to follow up, if at all?",
    "guard": {
     "ok": true,
     "reason": ""
@@ -56,7 +56,7 @@
   {
    "for": "A5call",
    "attempt": 1,
-   "reply": "Perfect, an advisor will call your cell at nine one eight, five five five, oh one four two, and nobody will text you or call the shop line. Thanks for reaching out today.",
+   "reply": "I've put your cell number on the advisor's callback task. No texts will go out. Thanks for calling.",
    "guard": {
     "ok": true,
     "reason": ""
@@ -68,7 +68,19 @@
   {
    "for": "A5stop",
    "attempt": 1,
-   "reply": "Understood, nobody will call or text you, not on your cell and not on the shop line, and the advisor will wait until you reach out to us. Thank you for calling, and I wish you the best as you explore.",
+   "reply": "Understood. Nobody will call or text you, and we'll wait to hear from you. Thanks for calling.",
+   "guard": {
+    "ok": false,
+    "reason": "promises secrecy"
+   },
+   "models": [
+    "claude-sonnet-5-5"
+   ]
+  },
+  {
+   "for": "A5stop",
+   "attempt": 2,
+   "reply": "Understood. Nobody will call or text you, and your number is just noted as the one you gave. Thanks for calling.",
    "guard": {
     "ok": true,
     "reason": ""
@@ -80,7 +92,7 @@
   {
    "for": "case:sales-restated",
    "attempt": 1,
-   "reply": "You told me about two million dollars in sales. What prompted you to call today?",
+   "reply": "You said about two million dollars in sales. What prompted you to call today?",
    "guard": {
     "ok": true,
     "reason": ""
@@ -92,7 +104,7 @@
   {
    "for": "case:direct-price",
    "attempt": 1,
-   "reply": "Sales alone don't tell us what a business could sell for, because buyers pay for what the company earns for its owner, and an advisor is the one who can speak to a number. How much of your work comes from recurring maintenance contracts?",
+   "reply": "I can't give a number, since pricing is something an advisor handles. Buyers pay for what the business earns for its owner, so how much of your work comes from recurring maintenance contracts?",
    "guard": {
     "ok": true,
     "reason": ""
@@ -104,7 +116,7 @@
   {
    "for": "case:owner-price",
    "attempt": 1,
-   "reply": "I can't speak to a price or a multiple, since an advisor handles that, and sales alone don't show what the business earns for you. How much of your work comes from recurring maintenance contracts?",
+   "reply": "I can't confirm any figure, because pricing is something an advisor handles. Buyers look closely at recurring work, so how much of your business comes from maintenance contracts?",
    "guard": {
     "ok": true,
     "reason": ""
@@ -116,19 +128,7 @@
   {
    "for": "case:employees",
    "attempt": 1,
-   "reply": "I can't promise that no one will find out, and I wouldn't want to guess. An advisor can explain how the firm handles confidentiality, and what prompted you to call today?",
-   "guard": {
-    "ok": false,
-    "reason": "promises secrecy"
-   },
-   "models": [
-    "claude-sonnet-5-5"
-   ]
-  },
-  {
-   "for": "case:employees",
-   "attempt": 2,
-   "reply": "I can't promise that either way, but an advisor can explain how the firm handles confidentiality. Is that part of what's been on your mind as you think about this?",
+   "reply": "I can't promise anything on that, but an advisor can explain how the firm handles confidentiality. Was that part of what got you thinking about this?",
    "guard": {
     "ok": true,
     "reason": ""
@@ -140,7 +140,7 @@
   {
    "for": "case:tax",
    "attempt": 1,
-   "reply": "That's a tax and legal question, so it belongs with your own advisers. Out of curiosity, how much of your business comes from recurring maintenance contracts?",
+   "reply": "That one belongs with your own advisers, so I can't weigh in on it. Can I ask how much of your business comes from recurring maintenance contracts?",
    "guard": {
     "ok": true,
     "reason": ""
@@ -152,6 +152,18 @@
   {
    "for": "extraction",
    "reply": "{\"sector\":\"hvac\",\"horizon\":\"just_exploring\",\"name_turn\":\"O1\",\"sales_turn\":\"O1\",\"price_question_turn\":\"O2\",\"recurring_turn\":\"O3\",\"cell_turn\":\"O4\",\"shop_line_turn\":\"O4\"}",
+   "models": [
+    "claude-sonnet-5-5"
+   ]
+  },
+  {
+   "for": "A5stop",
+   "attempt": 1,
+   "reply": "Understood. Nobody will call or text you. Thanks for calling.",
+   "guard": {
+    "ok": true,
+    "reason": ""
+   },
    "models": [
     "claude-sonnet-5-5"
    ]

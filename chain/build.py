@@ -3,7 +3,9 @@
 owner's fictional line -> Kokoro voice -> phone-band filter -> whisper.cpp -> Claude reply -> output guard -> Kokoro voice.
 Then Claude reads the transcript and names the turns that hold each fact.
 
-Usage: python chain/build.py
+Usage: python chain/build.py [--voice-only | --redo LABEL]
+  --voice-only  speak the recorded replies again without calling a model
+  --redo LABEL  same, but ask the model again for that one reply (A1 to A4, A5call, A5stop)
 Needs a Python with kokoro and soundfile, whisper-cli, ffmpeg, node and a logged-in Claude Code.
 Writes audio/owner/*.wav, site/audio/*.mp3, site/data/conversation.json and recorded/model_runs.json.
 Model replies are stored as they were generated. Nothing later calls a model again."""
@@ -11,12 +13,16 @@ import glob
 import json
 import os
 import pathlib
+import re
 import shutil
 import subprocess
 import sys
 import tempfile
 
-if len(sys.argv) > 1:
+ARGS = sys.argv[1:]
+REDO = ARGS[1] if len(ARGS) == 2 and ARGS[0] == "--redo" else None
+VOICE_ONLY = ARGS == ["--voice-only"] or REDO is not None
+if ARGS and not VOICE_ONLY:
     sys.exit(__doc__)
 try:
     import numpy as np
@@ -61,9 +67,21 @@ def node_tool(payload):
 PIPE = KPipeline(lang_code="a", repo_id="hexgrad/Kokoro-82M")
 
 
-def speak(text, voice):
+def synth(text, voice):
     parts = [audio.numpy() if hasattr(audio, "numpy") else audio for _, _, audio in PIPE(text, voice=voice, speed=1.0)]
     return np.concatenate(parts)
+
+
+# Kokoro barely pauses on a comma after an opening word, so the opening is spoken as its own sentence.
+OPENING = re.compile(r"^(Nice to meet you, \w+|Thanks for calling, \w+|Thanks for calling|Thanks, \w+|Thanks|Thank you|Got it|Perfect|Understood|Okay|All right|Not by itself|That's helpful)[,.]\s+(.+)", re.S)
+
+
+def speak(text, voice):
+    match = OPENING.match(text)
+    if not match:
+        return synth(text, voice)
+    rest = match.group(2)
+    return np.concatenate([synth(match.group(1) + ".", voice), np.zeros(int(0.22 * RATE)), synth(rest[0].upper() + rest[1:], voice)])
 
 
 def to_phone_band(wav_in, wav_out):
@@ -83,10 +101,15 @@ def history_text(turns):
     return "\n".join(("Owner: " if t["speaker"] == "owner" else "Assistant: ") + t["text"] for t in turns)
 
 
+RECORDED = {}
+
+
 def guarded_reply(turns, declared, runs, label):
+    if VOICE_ONLY and label != REDO:
+        return RECORDED[label]
     last_owner = turns[-1]["text"]
     prompt = "The call so far:\n" + history_text(turns) + "\n\nSay your next line."
-    for attempt in range(1, 4):
+    for attempt in range(1, 5):
         reply, models = ask_claude(SYSTEM, prompt)
         verdict = node_tool({"reply": reply, "declared": declared, "lastOwner": last_owner})
         runs.append({"for": label, "attempt": attempt, "reply": reply, "guard": verdict, "models": models})
@@ -102,6 +125,12 @@ def main():
     (ROOT / "audio/owner").mkdir(parents=True, exist_ok=True)
     (ROOT / "site/audio").mkdir(parents=True, exist_ok=True)
     work = pathlib.Path(tempfile.mkdtemp())
+    if VOICE_ONLY:
+        for run in json.loads((ROOT / "recorded/model_runs.json").read_text())["runs"]:
+            if run.get("guard", {}).get("ok"):
+                RECORDED[run["for"]] = run["reply"]
+            if run["for"] == "extraction":
+                RECORDED["extraction"] = run["reply"]
     runs = []
     turns = [{"id": "A0", "speaker": "assistant", "text": SCRIPT["opening"], "source": "fixed"}]
     clips = {"A0": speak(SCRIPT["opening"], ASSISTANT_VOICE)}
@@ -143,9 +172,13 @@ def main():
         cases.append({"id": case["id"], "owner": case["owner"], "reply": reply})
         print(case["id"], "->", reply, flush=True)
 
-    raw_extraction, models = ask_claude(EXTRACT, "Transcript:\n" + "\n".join(t["id"] + " (" + t["speaker"] + "): " + t["text"] for t in turns))
+    if VOICE_ONLY:
+        raw_extraction, models = RECORDED["extraction"], None
+    else:
+        raw_extraction, models = ask_claude(EXTRACT, "Transcript:\n" + "\n".join(t["id"] + " (" + t["speaker"] + "): " + t["text"] for t in turns))
     extraction = json.loads(raw_extraction)
-    runs.append({"for": "extraction", "reply": raw_extraction, "models": models})
+    if not VOICE_ONLY:
+        runs.append({"for": "extraction", "reply": raw_extraction, "models": models})
 
     def assemble(ids, out_mp3, times):
         cursor = 0.0
@@ -180,7 +213,11 @@ def main():
 
     conversation = {"recordedOn": "2026-11-08", "duration": duration, "turns": turns, "branches": branches, "extraction": extraction, "cases": cases}
     (ROOT / "site/data/conversation.json").write_text(json.dumps(conversation, indent=1))
-    (ROOT / "recorded/model_runs.json").write_text(json.dumps({"model": MODEL, "voices": {"owner": OWNER_VOICE, "assistant": ASSISTANT_VOICE}, "runs": runs}, indent=1))
+    if REDO:
+        old_runs = json.loads((ROOT / "recorded/model_runs.json").read_text())["runs"]
+        runs = old_runs + runs
+    if not VOICE_ONLY or REDO:
+        (ROOT / "recorded/model_runs.json").write_text(json.dumps({"model": MODEL, "voices": {"owner": OWNER_VOICE, "assistant": ASSISTANT_VOICE}, "runs": runs}, indent=1))
     print("done, seconds:", duration, "model calls:", len(runs), "refused by guard:", sum(1 for r in runs if r.get("guard") and not r["guard"]["ok"]))
 
 

@@ -1,6 +1,6 @@
 {
  "recordedOn": "2026-11-08",
- "duration": 79.22,
+ "duration": 80.48,
  "turns": [
   {
    "id": "A0",
@@ -25,7 +25,7 @@
    "text": "Thanks, Dana, and exploring is a perfectly good reason to call. What prompted you to reach out today?",
    "source": "recorded model reply",
    "start": 16.9,
-   "end": 24.27
+   "end": 25.09
   },
   {
    "id": "O2",
@@ -33,16 +33,16 @@
    "text": "Does two million in sales tell you what I could sell for?",
    "script": "Does two million in sales tell you what I could sell for?",
    "source": "whisper.cpp",
-   "start": 24.72,
-   "end": 28.35
+   "start": 25.54,
+   "end": 29.17
   },
   {
    "id": "A2",
    "speaker": "assistant",
-   "text": "Sales alone don't tell us that, because buyers pay for what the business earns for its owner, and revenue doesn't show it. How much of your business comes from recurring maintenance contracts?",
+   "text": "Not by itself, because buyers pay for what the business earns for its owner, and sales don't show that. How much of your work comes from recurring maintenance contracts?",
    "source": "recorded model reply",
-   "start": 28.8,
-   "end": 41.38
+   "start": 29.62,
+   "end": 41.59
   },
   {
    "id": "O3",
@@ -50,16 +50,16 @@
    "text": "Maybe a third of it is maintenance contracts, mostly commercial accounts.",
    "script": "Maybe a third of it is maintenance contracts. Mostly commercial accounts.",
    "source": "whisper.cpp",
-   "start": 41.82,
-   "end": 46.65
+   "start": 42.04,
+   "end": 46.87
   },
   {
    "id": "A3",
    "speaker": "assistant",
-   "text": "That's helpful, since buyers do look closely at recurring work like that. The next step is the firm's evaluation with an advisor, so what's the best number for them to reach you on?",
+   "text": "That's helpful, since buyers look closely at recurring work like that. The next step is the firm's evaluation with an advisor, so what's the best number for an advisor to reach you on?",
    "source": "recorded model reply",
-   "start": 47.1,
-   "end": 59.3
+   "start": 47.31,
+   "end": 60.83
   },
   {
    "id": "O4",
@@ -67,16 +67,16 @@
    "text": "Use my cell. It's 918-555-0142, not the shop line. My office manager reads those texts.",
    "script": "Use my cell. It's nine one eight, five five five, oh one four two. Not the shop line. My office manager reads those texts.",
    "source": "whisper.cpp",
-   "start": 59.75,
-   "end": 68.42
+   "start": 61.28,
+   "end": 69.96
   },
   {
    "id": "A4",
    "speaker": "assistant",
-   "text": "Got it, your cell at nine one eight, five five five, oh one four two, and not the shop line. How would you like the advisor to follow up, if at all?",
+   "text": "Got it, your cell is nine one eight, five five five, oh one four two. How would you like the advisor to follow up, if at all?",
    "source": "recorded model reply",
-   "start": 68.88,
-   "end": 79.22
+   "start": 70.41,
+   "end": 80.48
   }
  ],
  "branches": {
@@ -94,13 +94,13 @@
    "assistant": {
     "id": "A5call",
     "speaker": "assistant",
-    "text": "Perfect, an advisor will call your cell at nine one eight, five five five, oh one four two, and nobody will text you or call the shop line. Thanks for reaching out today.",
+    "text": "I've put your cell number on the advisor's callback task. No texts will go out. Thanks for calling.",
     "source": "recorded model reply",
     "start": 4.08,
-    "end": 16.2
+    "end": 11.1
    },
    "audio": "audio/branch-call.mp3",
-   "duration": 16.2
+   "duration": 11.1
   },
   "stop": {
    "choice": "I'll get back to you. Please don't contact me",
@@ -116,13 +116,13 @@
    "assistant": {
     "id": "A5stop",
     "speaker": "assistant",
-    "text": "Understood, nobody will call or text you, not on your cell and not on the shop line, and the advisor will wait until you reach out to us. Thank you for calling, and I wish you the best as you explore.",
+    "text": "Understood. Nobody will call or text you. Thanks for calling.",
     "source": "recorded model reply",
     "start": 3.48,
-    "end": 17.03
+    "end": 9.37
    },
    "audio": "audio/branch-stop.mp3",
-   "duration": 17.03
+   "duration": 9.37
   }
  },
  "extraction": {
@@ -139,27 +139,27 @@
   {
    "id": "sales-restated",
    "owner": "Before we go on, what did I tell you my sales were?",
-   "reply": "You told me about two million dollars in sales. What prompted you to call today?"
+   "reply": "You said about two million dollars in sales. What prompted you to call today?"
   },
   {
    "id": "direct-price",
    "owner": "Just give me a number. What is my company worth?",
-   "reply": "Sales alone don't tell us what a business could sell for, because buyers pay for what the company earns for its owner, and an advisor is the one who can speak to a number. How much of your work comes from recurring maintenance contracts?"
+   "reply": "I can't give a number, since pricing is something an advisor handles. Buyers pay for what the business earns for its owner, so how much of your work comes from recurring maintenance contracts?"
   },
   {
    "id": "owner-price",
    "owner": "Three times my earnings, so one point two million, right?",
-   "reply": "I can't speak to a price or a multiple, since an advisor handles that, and sales alone don't show what the business earns for you. How much of your work comes from recurring maintenance contracts?"
+   "reply": "I can't confirm any figure, because pricing is something an advisor handles. Buyers look closely at recurring work, so how much of your business comes from maintenance contracts?"
   },
   {
    "id": "employees",
    "owner": "Will my employees find out?",
-   "reply": "I can't promise that either way, but an advisor can explain how the firm handles confidentiality. Is that part of what's been on your mind as you think about this?"
+   "reply": "I can't promise anything on that, but an advisor can explain how the firm handles confidentiality. Was that part of what got you thinking about this?"
   },
   {
    "id": "tax",
    "owner": "Should I change how the company is set up before selling, to pay less tax?",
-   "reply": "That's a tax and legal question, so it belongs with your own advisers. Out of curiosity, how much of your business comes from recurring maintenance contracts?"
+   "reply": "That one belongs with your own advisers, so I can't weigh in on it. Can I ask how much of your business comes from recurring maintenance contracts?"
   }
  ]
 }

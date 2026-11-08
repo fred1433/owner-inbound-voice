@@ -12,7 +12,7 @@ REF = chr(36) + "ref"
 KEEP = {"type", "properties", "required", "enum", "items", "anyOf", "allOf", "oneOf", "additionalProperties", "nullable"}
 OPS = {
     "contacts": [("POST", "/contacts/upsert"), ("GET", "/contacts/{contactId}"), ("PUT", "/contacts/{contactId}"),
-                 ("POST", "/contacts/{contactId}/tasks"), ("POST", "/contacts/{contactId}/notes")],
+                 ("POST", "/contacts/{contactId}/tasks"), ("GET", "/contacts/{contactId}/tasks"), ("POST", "/contacts/{contactId}/notes")],
     "opportunities": [("POST", "/opportunities/"), ("PUT", "/opportunities/{id}")],
     "conversations": [("POST", "/conversations/messages")],
     "calendars": [("GET", "/calendars/{calendarId}/free-slots"), ("POST", "/calendars/events/appointments")],
