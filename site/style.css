@@ -178,9 +178,7 @@ details summary { cursor: pointer; font-weight: 700; padding: 6px 0; }
   .card-stage { font-size: 14px; line-height: 18px; text-align: left; }
   .rows .row { grid-template-columns: 1fr; }
   .rows dt { line-height: var(--line); }
-  .stamp { right: 12px; bottom: 16px; font-size: 25px; padding: 5px 12px 4px; border-width: 3px; }
-  .stamp.is-stop { font-size: 27px; }
-  .card { padding-bottom: calc(var(--line) * 3); }
+  .stamp, .stamp.is-stop { right: 10px; top: 8px; bottom: auto; font-size: 19px; padding: 4px 9px 3px; border-width: 3px; white-space: normal; max-width: 6.4em; text-align: center; }
   .sheet { padding: 22px 16px; margin: 0 -16px; }
   .transcript li { grid-template-columns: 40px minmax(0, 1fr); }
   .transcript .who { grid-column: 2; line-height: 20px; }

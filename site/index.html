@@ -94,7 +94,7 @@
       <h2>What runs when you click</h2>
       <p>The same code as the replay command. It reads the words of her last answer, writes to a mock CRM, reads the contact back, then tries the text and the callback. Your click changes the words it reads. The result is worked out each time.</p>
       <p>There is no phone line and no real CRM account behind this. Requests and responses are checked against HighLevel's published API schemas, pinned at commit <span id="commit"></span>. A real sub-account still has to confirm duplicate settings, notifications, and how it answers a blocked text.</p>
-      <p>Rerun all of it, including rewordings that are not in the audio, with no network and no key: <code>node replay.mjs</code> in <a href="https://github.com/fred1433/owner-inbound-voice">the public repository</a>.</p>
+      <p>Rerun all of it, including rewordings that are not in the audio: <code>node replay.mjs</code> in <a href="https://github.com/fred1433/owner-inbound-voice">the public repository</a>. Once the speech model is downloaded it needs no network and no key.</p>
       <details id="requests">
         <summary>Requests the mock CRM received <span id="request-count"></span></summary>
         <ol id="request-list" class="requests"></ol>
@@ -133,7 +133,7 @@
   <span id="mini-time" class="time">0:00</span>
 </div>
 
-<audio id="audio" src="audio/conversation.mp3" preload="metadata"></audio>
+<audio id="audio" src="audio/conversation.mp3" preload="auto"></audio>
 <audio id="branch-audio" preload="none"></audio>
 <script type="module" src="app.js"></script>
 </body>
