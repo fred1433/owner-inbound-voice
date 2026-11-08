@@ -13,7 +13,7 @@ export const STAGES = {
   stage_new_inbound: "New inbound",
   stage_advisor_review: "Advisor review",
   stage_advisor_callback: "Advisor callback",
-  stage_no_contact: "Closed, owner asked for no contact",
+  stage_no_contact: "Closed, no contact",
 };
 
 // ---------- Words ----------
