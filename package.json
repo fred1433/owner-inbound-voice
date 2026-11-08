@@ -1,0 +1,7 @@
+{
+  "name": "owner-inbound-voice",
+  "private": true,
+  "type": "module",
+  "scripts": { "replay": "node replay.mjs" },
+  "engines": { "node": ">=20" }
+}

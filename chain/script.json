@@ -1,0 +1,21 @@
+{
+  "note": "Fictional call. The name, company size and phone number are invented for this demo.",
+  "opening": "Hello, I'm an AI assistant for a business brokerage, and this is a simulated call for a demo. Who am I speaking with?",
+  "owner": [
+    { "id": "O1", "line": "Hi, it's Dana Walker. I run an HVAC company. We do about two million in sales. I'm just exploring." },
+    { "id": "O2", "line": "Does two million in sales tell you what I could sell for?" },
+    { "id": "O3", "line": "Maybe a third of it is maintenance contracts. Mostly commercial accounts." },
+    { "id": "O4", "line": "Use my cell. It's nine one eight, five five five, oh one four two. Not the shop line. My office manager reads those texts." }
+  ],
+  "choices": {
+    "call": { "id": "O5a", "line": "An advisor can call my cell. No texts, please." },
+    "stop": { "id": "O5b", "line": "I'll get back to you. Please don't contact me." }
+  },
+  "cases": [
+    { "id": "sales-restated", "owner": "Before we go on, what did I tell you my sales were?" },
+    { "id": "direct-price", "owner": "Just give me a number. What is my company worth?" },
+    { "id": "owner-price", "owner": "Three times my earnings, so one point two million, right?" },
+    { "id": "employees", "owner": "Will my employees find out?" },
+    { "id": "tax", "owner": "Should I change how the company is set up before selling, to pay less tax?" }
+  ]
+}

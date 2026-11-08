@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>While you were out</title>
+<meta name="description" content="A simulated inbound call between a business owner and an AI assistant, and the card the advisor opens afterwards.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon.png" type="image/png">
+<link rel="preload" href="fonts/LibreFranklin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/CourierPrime-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<svg class="defs" aria-hidden="true" width="0" height="0">
+  <filter id="ink" x="-5%" y="-5%" width="110%" height="110%">
+    <feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="2" seed="4" result="wobble"/>
+    <feDisplacementMap in="SourceGraphic" in2="wobble" scale="2.4" result="rough"/>
+    <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="9" result="grain"/>
+    <feColorMatrix in="grain" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -3.2 2.5" result="speckle"/>
+    <feComposite in="rough" in2="speckle" operator="in"/>
+  </filter>
+</svg>
+
+<main>
+  <header class="top">
+    <h1>While you were out, an owner called.</h1>
+    <p class="lede">An AI assistant took the call. Press play and watch the card an advisor would open fill in, then change her last answer and see what the card does.</p>
+  </header>
+
+  <section class="folder" aria-label="The call and the advisor's card">
+    <div class="tab"><span id="tab-name">Owner inbound</span></div>
+
+    <div class="slip">
+      <svg class="clip" viewBox="0 0 34 92" aria-hidden="true"><path d="M23 18 V70 a9 9 0 0 1 -18 0 V16 a12 12 0 0 1 24 0 V66" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg>
+      <h2 class="slip-title">Important message</h2>
+      <dl class="slip-form">
+        <div><dt>For</dt><dd>An advisor</dd></div>
+        <div><dt>From</dt><dd id="slip-name">&nbsp;</dd></div>
+        <div><dt>Phone</dt><dd id="slip-phone">&nbsp;</dd></div>
+      </dl>
+      <ul class="boxes" aria-label="Message type">
+        <li id="box-telephoned"><span class="box"></span>Telephoned</li>
+        <li id="box-please"><span class="box"></span>Please call</li>
+        <li id="box-again"><span class="box"></span>Will call again</li>
+      </ul>
+
+      <div class="player">
+        <button id="play" class="play" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path id="play-glyph" d="M5 3 L17 10 L5 17 Z"/></svg><span id="play-label">Hear the owner</span></button>
+        <div class="scrub">
+          <input id="scrub" type="range" min="0" max="100" step="0.1" value="0" aria-label="Position in the call">
+          <span id="time" class="time">0:00</span>
+        </div>
+        <p class="mention">Independent demo · Simulated inbound conversation · Mock CRM</p>
+      </div>
+
+      <fieldset id="choice" class="choice">
+        <legend>Her last answer</legend>
+        <label><input type="radio" name="choice" value="call"><span class="box"></span><span id="label-call"></span></label>
+        <label><input type="radio" name="choice" value="stop"><span class="box"></span><span id="label-stop"></span></label>
+      </fieldset>
+      <p class="signed"><span>Signed</span> AI assistant</p>
+    </div>
+
+    <article id="card" class="card" aria-label="The advisor's card" aria-live="polite">
+      <header class="card-head">
+        <p id="card-name" class="card-name"></p>
+        <p id="card-stage" class="card-stage"></p>
+      </header>
+      <p id="card-hint" class="card-hint">Empty until she starts talking.</p>
+      <dl class="rows">
+        <div class="row key"><dt>Question to handle</dt><dd id="f-question"></dd></div>
+        <div class="row key"><dt>Number to use</dt><dd id="f-number"></dd></div>
+        <div class="row key"><dt>Follow-up</dt><dd id="f-followup"></dd></div>
+        <div class="row key valuation"><dt>Valuation</dt><dd><span id="f-valuation"></span><small id="f-valuation-note">Empty on purpose. The assistant never fills this line. An advisor does.</small></dd></div>
+        <div class="row"><dt>Business</dt><dd id="f-business"></dd></div>
+        <div class="row"><dt>Sales, her words</dt><dd id="f-sales"></dd></div>
+        <div class="row"><dt>Recurring work</dt><dd id="f-recurring"></dd></div>
+        <div class="row"><dt>Timing</dt><dd id="f-horizon"></dd></div>
+      </dl>
+      <div id="stamp" class="stamp" hidden><span id="stamp-text"></span></div>
+    </article>
+  </section>
+
+  <section class="record">
+    <div class="sheet">
+      <h2>The call, word for word</h2>
+      <p class="sheet-note">The owner is fictional. Her lines were spoken by a local synthetic voice and read back by speech-to-text, so this is what the software heard. The assistant's lines are model replies, recorded once, checked by the output guard and frozen. Nothing on this page calls a model.</p>
+      <ol id="transcript" class="transcript"></ol>
+    </div>
+
+    <aside class="notes">
+      <h2>What runs when you click</h2>
+      <p>The same code as the replay command. It reads the words of her last answer, writes to a mock CRM, reads the contact back, then tries the text and the callback. Your click changes the words it reads. The result is worked out each time.</p>
+      <p>There is no phone line and no real CRM account behind this. Requests and responses are checked against HighLevel's published API schemas, pinned at commit <span id="commit"></span>. A real sub-account still has to confirm duplicate settings, notifications, and how it answers a blocked text.</p>
+      <p>Rerun all of it, including rewordings that are not in the audio, with no network and no key: <code>node replay.mjs</code> in <a href="https://github.com/fred1433/owner-inbound-voice">the public repository</a>.</p>
+      <details id="requests">
+        <summary>Requests the mock CRM received <span id="request-count"></span></summary>
+        <ol id="request-list" class="requests"></ol>
+      </details>
+    </aside>
+  </section>
+
+  <section class="after">
+    <div class="booking">
+      <h2>If she picks a time herself</h2>
+      <p>A second case, with no audio. It ran in your browser when this page loaded, against the same mock calendar.</p>
+      <ol id="booking" class="booking-lines"></ol>
+    </div>
+    <div class="pilot">
+      <h2>First pilot</h2>
+      <ul>
+        <li>One inbound line</li>
+        <li>One calendar</li>
+        <li>A test sub-account</li>
+        <li>Answers the client has approved</li>
+        <li>A check that notifications reach the advisor</li>
+      </ul>
+      <p>Stack: a telephony and voice layer, speech-to-text, Claude for the conversation with this guard in front of it, and the HighLevel API.</p>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <div id="sources" class="sources" hidden></div>
+    <p>Built by Frederic de Lavenne de Choulot, The AI Pipe. <a href="https://cal.theaipipe.com">Book 15 minutes</a> to go through it.</p>
+  </footer>
+</main>
+
+<div id="minibar" class="minibar" hidden>
+  <button id="mini-play" type="button">Pause</button>
+  <div class="mini-track"><div id="mini-fill"></div></div>
+  <span id="mini-time" class="time">0:00</span>
+</div>
+
+<audio id="audio" src="audio/conversation.mp3" preload="metadata"></audio>
+<audio id="branch-audio" preload="none"></audio>
+<script type="module" src="app.js"></script>
+</body>
+</html>
